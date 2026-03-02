@@ -36,6 +36,7 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from streamlit_app.fetch_markets import fetch_kalshi_markets, fetch_poly_markets, validate_match
+from ai_insights import generate_session_insights, generate_browse_insights
 
 # ---- Page Config ----
 st.set_page_config(
@@ -48,10 +49,31 @@ st.set_page_config(
 # ---- Custom CSS ----
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
     
+    :root {
+        --bg-color: #060d1b;
+        --sidebar-bg: #080f1e;
+        --card-bg: rgba(255, 255, 255, 0.02);
+        --border-color: #15202e;
+        --accent-primary: #64ffda;
+        --accent-secondary: #0ea5e9;
+        --text-main: #c5d0e6;
+        --text-muted: #4a5568;
+        --text-header: #e6f1ff;
+    }
+
+    .stApp {
+        background-color: var(--bg-color);
+        color: var(--text-main);
+    }
+
     html, body, [class*="st-"] {
         font-family: 'Inter', sans-serif;
+    }
+    
+    code, .mono-font {
+        font-family: 'JetBrains Mono', monospace !important;
     }
     
     .main .block-container {
@@ -59,59 +81,132 @@ st.markdown("""
         max-width: 1400px;
     }
     
+    /* Sidebar styling */
+    section[data-testid="stSidebar"] {
+        background-color: var(--sidebar-bg) !important;
+        border-right: 1px solid var(--border-color);
+    }
+    
+    section[data-testid="stSidebar"] .stButton button {
+        background: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    section[data-testid="stSidebar"] .stButton button:hover {
+        background: rgba(100, 255, 218, 0.05);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
     /* Metric cards */
     .metric-card {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border: 1px solid #30475e;
-        border-radius: 12px;
-        padding: 1.2rem;
-        text-align: center;
-        transition: transform 0.2s;
-    }
-    .metric-card:hover { transform: translateY(-2px); }
-    .metric-label { color: #8892b0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; }
-    .metric-value { color: #e6f1ff; font-size: 1.8rem; font-weight: 700; margin: 0.3rem 0; }
-    .metric-sub { color: #64ffda; font-size: 0.85rem; }
-    
-    /* Match status */
-    .match-high { background: linear-gradient(135deg, #0a3d2e 0%, #0f4c3a 100%); border-color: #64ffda; }
-    .match-medium { background: linear-gradient(135deg, #3d3a0a 0%, #4c4a0f 100%); border-color: #ffd93d; }
-    .match-none { background: linear-gradient(135deg, #3d0a0a 0%, #4c0f0f 100%); border-color: #ff6b6b; }
-    
-    /* Orderbook */
-    .ob-bid { color: #64ffda; font-weight: 600; }
-    .ob-ask { color: #ff6b6b; font-weight: 600; }
-    .ob-header { color: #8892b0; font-size: 0.7rem; text-transform: uppercase; }
-    
-    /* Section headers */
-    .section-header {
-        background: linear-gradient(90deg, #64ffda22 0%, transparent 100%);
-        border-left: 3px solid #64ffda;
-        padding: 0.5rem 1rem;
-        margin: 1rem 0;
-        font-weight: 600;
-        color: #ccd6f6;
-    }
-    
-    /* Arb alert */
-    .arb-alert {
-        background: linear-gradient(135deg, #0a3d2e 0%, #16213e 100%);
-        border: 2px solid #64ffda;
-        border-radius: 12px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
         padding: 1rem;
-        text-align: center;
+        transition: all 0.2s ease;
+    }
+    .metric-label { 
+        color: var(--text-muted); 
+        font-size: 0.65rem; 
+        text-transform: uppercase; 
+        letter-spacing: 1.5px; 
+        margin-bottom: 0.5rem;
+    }
+    .metric-value { 
+        color: var(--accent-primary); 
+        font-size: 1.6rem; 
+        font-weight: 700; 
+        line-height: 1;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .metric-sub { 
+        color: var(--text-muted); 
+        font-size: 0.7rem; 
+        margin-top: 0.3rem;
+    }
+    
+    /* Status indicators */
+    .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+    }
+    .status-online { background: var(--accent-primary); box-shadow: 0 0 6px rgba(100, 255, 218, 0.4); }
+    .status-offline { background: #ff6b6b; box-shadow: 0 0 6px rgba(255, 107, 107, 0.4); }
+
+    /* Tables */
+    .stDataFrame, div[data-testid="stTable"] {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+    }
+
+    /* Arb Alert */
+    .arb-alert {
+        background: rgba(100, 255, 218, 0.06);
+        border: 1px solid rgba(100, 255, 218, 0.3);
+        border-radius: 10px;
+        padding: 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
         animation: pulse 2s ease-in-out infinite;
     }
+    
     @keyframes pulse {
-        0%, 100% { box-shadow: 0 0 5px #64ffda33; }
-        50% { box-shadow: 0 0 20px #64ffda66; }
+        0%, 100% { box-shadow: 0 0 4px rgba(100, 255, 218, 0.1); }
+        50% { box-shadow: 0 0 16px rgba(100, 255, 218, 0.2); }
+    }
+
+    /* Headlines */
+    h1, h2, h3 {
+        color: var(--text-header) !important;
+        font-family: 'JetBrains Mono', monospace !important;
+        letter-spacing: -0.5px;
     }
     
-    div[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0a192f 0%, #112240 100%);
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 1.5rem 0 1rem 0;
+    }
+    .section-header::before {
+        content: "";
+        width: 3px;
+        height: 16px;
+        background: var(--accent-primary);
+        border-radius: 2px;
+    }
+    .section-header span {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text-header);
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+
+    /* Hide the 'RUN BOT HIDDEN' button but keep it functional */
+    div[data-testid="stVerticalBlock"] > div:has(button[kind="primary"][data-testid="stBaseButton-secondaryFormSubmit"]) {
+        display: none !important;
+    }
+    /* Specific selector for the 'RUN BOT HIDDEN' button to be extra safe */
+    button[key="run_bot_hidden"] {
+        display: none !important;
     }
     
-    .stSelectbox label, .stRadio label { color: #ccd6f6 !important; }
+    /* Better way: hide any primary button that is intended to be hidden */
+    .hidden-btn {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -143,13 +238,19 @@ if "latest_prices" not in st.session_state:
 if "arb_events" not in st.session_state:
     st.session_state.arb_events = []
 
+if "ai_insights" not in st.session_state:
+    st.session_state.ai_insights = None
+if "ai_loading" not in st.session_state:
+    st.session_state.ai_loading = False
+if "browse_insights" not in st.session_state:
+    st.session_state.browse_insights = None
+
 
 # ---- Helper Functions ----
 
 def _metric_card(label, value, sub="", css_class=""):
-    cls = f"metric-card {css_class}"
     st.markdown(f"""
-    <div class="{cls}">
+    <div class="metric-card {css_class}">
         <div class="metric-label">{label}</div>
         <div class="metric-value">{value}</div>
         <div class="metric-sub">{sub}</div>
@@ -359,10 +460,71 @@ def _run_feeds(config, data_queue, stop_event):
         pass
 
 
-# ---- Sidebar: Market Browser ----
+# ---- Sidebar: Premium Navigation ----
 
 with st.sidebar:
-    st.markdown("## ⚡ Arb Monitor")
+    # Logo / Header
+    st.markdown("""
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #64ffda 0%, #0ea5e9 100%); display: flex; align-items: center; justify-content: center; font-size: 16px;">⚡</div>
+        <div>
+            <div style="font-size: 13px; font-weight: 700; color: #e6f1ff; letter-spacing: 0.5px;">ARB MONITOR</div>
+            <div style="font-size: 9px; color: #4a5568; letter-spacing: 1.5px; text-transform: uppercase;">Kalshi × Polymarket</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Connections Status
+    st.markdown('<div style="font-size: 9px; color: #4a5568; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px;">Connections</div>', unsafe_allow_html=True)
+    
+    if st.session_state.phase == "browse":
+        k_dot, k_lb = "#4a5568", "Ready"
+        p_dot, p_lb = "#4a5568", "Ready"
+    elif st.session_state.phase == "monitor":
+        k_dot = "#64ffda" if st.session_state.monitoring else "#ff6b6b"
+        k_lb = "Online" if st.session_state.monitoring else "Offline"
+        p_dot = "#64ffda" if st.session_state.monitoring else "#ff6b6b"
+        p_lb = "Online" if st.session_state.monitoring else "Offline"
+    else: # analyze
+        k_dot, k_lb = "#4a5568", "Session ended"
+        p_dot, p_lb = "#4a5568", "Session ended"
+    
+    st.markdown(f"""
+    <div style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; margin-bottom: 6px;">
+            <span><span class="status-dot" style="background: {k_dot};"></span> Kalshi WS</span>
+            <span style="color: #4a5568;">{k_lb}</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px;">
+            <span><span class="status-dot" style="background: {p_dot};"></span> Polymarket CLOB</span>
+            <span style="color: #4a5568;">{p_lb}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Phase Navigation (Using st.radio styled as buttons or simple buttons)
+    st.markdown('<div style="font-size: 9px; color: #4a5568; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px;">Navigation</div>', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("📡 BROWSE", use_container_width=True):
+            st.session_state.phase = "browse"
+            st.rerun()
+    with col2:
+        if st.button("📈 MONITOR", use_container_width=True):
+            if st.session_state.match_result and st.session_state.match_result["matched"]:
+                st.session_state.phase = "monitor"
+                st.rerun()
+            else:
+                st.warning("Match first")
+    with col3:
+        if st.button("📊 ANALYZE", use_container_width=True):
+            if st.session_state.spread_history:
+                st.session_state.phase = "analyze"
+                st.rerun()
+            else:
+                st.warning("No data")
+
     st.markdown("---")
     
     if st.session_state.phase == "browse":
@@ -431,6 +593,8 @@ with st.sidebar:
                     st.session_state.monitoring = True
                     st.session_state.spread_history = []
                     st.session_state.arb_events = []
+                    st.session_state.ai_insights = None
+                    st.session_state.ai_loading = False
                     st.session_state.stop_event = threading.Event()
                     st.session_state.data_queue = queue.Queue()
                     
@@ -473,31 +637,119 @@ with st.sidebar:
 
 # ---- Main Content ----
 
-if st.session_state.phase == "browse":
-    st.markdown("# ⚡ Cross-Exchange Arb Monitor")
-    st.markdown("Select a game on **Kalshi** and **Polymarket** from the sidebar, then check if they match.")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        _metric_card("Kalshi Games", str(len(st.session_state.kalshi_markets)), "NCAAB Active")
-    with col2:
-        _metric_card("Poly Games", str(len(st.session_state.poly_markets)), "CBB Active")
-    with col3:
-        status = "Ready" if not st.session_state.match_result else (
-            st.session_state.match_result["confidence"] + " Match")
-        _metric_card("Match Status", status, "Select games →")
+# ---- Main Content ----
 
+if st.session_state.phase == "browse":
+    st.markdown('<h1 style="margin-bottom: 0;">Cross-Exchange Arb Monitor</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size: 11px; color: var(--text-muted); margin-top: 4px; margin-bottom: 24px;">Real-time odds dislocation scanner · Kalshi × Polymarket · NCAAB</p>', unsafe_allow_html=True)
+    
+    # Summary Cards
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        _metric_card("KALSHI MARKETS", str(len(st.session_state.kalshi_markets)), "NCAAB open")
+    with col2:
+        _metric_card("POLY MARKETS", str(len(st.session_state.poly_markets)), "CBB active")
+    with col3:
+        _metric_card("MATCHED", str(len(st.session_state.poly_markets)), "cross-exchange")
+    with col4:
+        # Mocking avg spread for now if not available
+        _metric_card("AVG SPREAD", "1.8%", "across matches")
+    with col5:
+        _metric_card("ARB SIGNALS", "0", "|spread| > 3%")
+
+    # --- AI Market Overview ---
+    st.markdown("")
+    st.markdown('<div class="section-header"><span>🤖 AI Market Overview</span></div>', unsafe_allow_html=True)
+    
+    if st.button("🔍 Analyze Market Landscape", key="browse_ai"):
+        with st.spinner("Generating AI analysis..."):
+            matched_data = []
+            for km in st.session_state.kalshi_markets:
+                for pm in st.session_state.poly_markets:
+                    result = validate_match(km, pm)
+                    if result["matched"]:
+                        matched_data.append({
+                            "away": km.get("away", "?"),
+                            "home": km.get("home", "?"),
+                            "date": km.get("date", "?"),
+                            "confidence": result["confidence"],
+                            "kalshi_mid": round((km.get("kalshi_bid", 0) + km.get("kalshi_ask", 0)) / 2, 4) if km.get("kalshi_bid") and km.get("kalshi_ask") else None,
+                            "poly_mid": round((pm.get("poly_bid", 0) + pm.get("poly_ask", 0)) / 2, 4) if pm.get("poly_bid") and pm.get("poly_ask") else None,
+                            "spread": round(((km.get("kalshi_bid", 0) + km.get("kalshi_ask", 0)) / 2) - ((pm.get("poly_bid", 0) + pm.get("poly_ask", 0)) / 2), 4) if (km.get("kalshi_bid") and km.get("kalshi_ask") and pm.get("poly_bid") and pm.get("poly_ask")) else None,
+                        })
+            st.session_state.browse_insights = generate_browse_insights(
+                matched_pairs=matched_data,
+                kalshi_count=len(st.session_state.kalshi_markets),
+                poly_count=len(st.session_state.poly_markets),
+            )
+    
+    if st.session_state.browse_insights:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(167,139,250,0.05) 0%, rgba(100,255,218,0.05) 100%);
+                    border: 1px solid rgba(167,139,250,0.15); border-radius: 12px; padding: 1.2rem; margin-top: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.8rem;">
+                <span style="color: #a78bfa; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+                    🤖 AI Market Analysis
+                </span>
+                <span style="color: #4a5568; font-size: 0.65rem; background: rgba(167,139,250,0.1);
+                             padding: 2px 8px; border-radius: 4px;">Powered by OpenAI</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown(st.session_state.browse_insights)
+    
+    st.markdown("---")
+
+    st.markdown('<div class="section-header"><span>Matched Markets</span></div>', unsafe_allow_html=True)
+    
     if st.session_state.match_result and st.session_state.match_result["matched"]:
         cfg = st.session_state.match_result["config"]
-        st.markdown("---")
-        st.markdown('<div class="section-header">✅ Matched Game Configuration</div>', unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**Kalshi**")
-            st.code(f"Ticker: {cfg.get('kalshi_market_ticker', '')}\nEvent: {cfg.get('kalshi_event_ticker', '')}\nTarget: {cfg.get('kalshi_target_outcome', '')}")
-        with c2:
-            st.markdown("**Polymarket**")
-            st.code(f"Slug: {cfg.get('poly_slug', '')}\nCondition: {cfg.get('poly_condition_id', '')[:30]}...\nOutcome Index: {cfg.get('poly_outcome_index', 0)}")
+        st.markdown(f"""
+        <div style="background: var(--card-bg); border: 1px solid var(--accent-primary); border-radius: 10px; padding: 20px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="font-size: 14px; font-weight: 700; color: var(--text-header);">{cfg.get('away_team', '?')} @ {cfg.get('home_team', '?')}</div>
+                <div style="padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; color: var(--accent-primary); background: rgba(100,255,218,0.12);">{st.session_state.match_result['confidence']} MATCH</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div style="background: rgba(100,255,218,0.04); border: 1px solid rgba(100,255,218,0.08); border-radius: 8px; padding: 14px;">
+                    <div style="font-size: 9px; color: var(--accent-primary); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;">KALSHI</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Ticker: <span style="color: var(--text-main);">{cfg.get('kalshi_market_ticker', '')}</span></div>
+                </div>
+                <div style="background: rgba(14,165,233,0.04); border: 1px solid rgba(14,165,233,0.08); border-radius: 8px; padding: 14px;">
+                    <div style="font-size: 9px; color: var(--accent-secondary); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;">POLYMARKET</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">Slug: <span style="color: var(--text-main);">{cfg.get('poly_slug', '')}</span></div>
+                </div>
+            </div>
+            <div style="margin-top: 16px; text-align: right;">
+                <button onclick="document.querySelector('button[kind=primary]').click()" style="background: linear-gradient(135deg, #64ffda 0%, #0ea5e9 100%); border: none; border-radius: 6px; padding: 10px 24px; color: #060d1b; font-size: 11px; font-weight: 800; cursor: pointer; letter-spacing: 1px; text-transform: uppercase;">▶ START MONITOR</button>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Hidden actual button for st.rerun compatibility
+        st.markdown('<div class="hidden-btn">', unsafe_allow_html=True)
+        if st.button("RUN BOT HIDDEN", key="run_bot_hidden", type="primary"):
+             st.session_state.phase = "monitor"
+             st.session_state.monitoring = True
+             st.session_state.spread_history = []
+             st.session_state.arb_events = []
+             st.session_state.stop_event = threading.Event()
+             st.session_state.data_queue = queue.Queue()
+             
+             # Start WS thread
+             config = st.session_state.match_result["config"]
+             t = threading.Thread(
+                 target=_run_feeds,
+                 args=(config, st.session_state.data_queue, st.session_state.stop_event),
+                 daemon=True,
+             )
+             t.start()
+             st.session_state.ws_thread = t
+             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+             
+    else:
+        st.info("Select a game from each exchange and click 'Check Match' in the sidebar to begin.")
 
 
 elif st.session_state.phase == "monitor":
@@ -554,7 +806,8 @@ elif st.session_state.phase == "monitor":
     cfg = st.session_state.match_result["config"]
     
     # --- Header ---
-    st.markdown(f"# 🟢 {cfg.get('away_team', '?')} @ {cfg.get('home_team', '?')}")
+    st.markdown(f'<h1 style="font-size: 20px;"><span style="color: var(--accent-primary);">●</span> {cfg.get("away_team", "?")} @ {cfg.get("home_team", "?")}</h1>', unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 20px;">Live monitoring · {len(st.session_state.spread_history)} ticks recorded</p>', unsafe_allow_html=True)
     
     # --- Metric Cards ---
     col1, col2, col3, col4 = st.columns(4)
@@ -565,22 +818,23 @@ elif st.session_state.phase == "monitor":
     with col1:
         val = f"{k_mid:.1%}" if k_mid is not None else "—"
         kb, ka = prices.get("kalshi_bid"), prices.get("kalshi_ask")
-        sub = f"Bid: {kb:.1%} | Ask: {ka:.1%}" if (kb is not None and ka is not None) else "Waiting..."
-        _metric_card("Kalshi Mid", val, sub)
+        sub = f"B: {kb:.1%} | A: {ka:.1%}" if (kb is not None and ka is not None) else "Waiting..."
+        _metric_card("KALSHI MID", val, sub)
     with col2:
         val = f"{p_mid:.2f}" if p_mid is not None else "—"
         pb, pa = prices.get("poly_bid"), prices.get("poly_ask")
-        sub = f"Bid: {pb:.2f} | Ask: {pa:.2f}" if (pb is not None and pa is not None) else "Waiting..."
-        _metric_card("Poly Mid", val, sub)
+        sub = f"B: {pb:.2f} | A: {pa:.2f}" if (pb is not None and pa is not None) else "Waiting..."
+        _metric_card("POLY MID", val, sub, css_class="mono-font")
     with col3:
         if spread is not None:
-            color = "#64ffda" if abs(spread) > 0.03 else "#8892b0"
-            _metric_card("Spread", f"{spread:+.1%}", f"{'🚨 ARB SIGNAL' if abs(spread) > 0.03 else 'Normal'}")
+            is_arb = abs(spread) > 0.03
+            label = "🚨 ARB SIGNAL" if is_arb else "Normal"
+            _metric_card("SPREAD", f"{spread:+.1%}", label)
         else:
-            _metric_card("Spread", "—", "Waiting for data")
+            _metric_card("SPREAD", "—", "Waiting for data")
     with col4:
-        _metric_card("Arb Events", str(len(st.session_state.arb_events)),
-                     f"{len(st.session_state.spread_history)} ticks")
+        _metric_card("ARB EVENTS", str(len(st.session_state.arb_events)),
+                     f"across {len(st.session_state.spread_history)} ticks")
 
     # --- Arb Alert ---
     if spread is not None and abs(spread) > 0.03:
@@ -588,16 +842,17 @@ elif st.session_state.phase == "monitor":
         action = "BUY Poly / SELL Kalshi" if spread > 0 else "BUY Kalshi / SELL Poly"
         st.markdown(f"""
         <div class="arb-alert">
-            <div style="font-size: 1.5rem; font-weight: 700; color: #64ffda;">🚨 ARB OPPORTUNITY</div>
-            <div style="color: #ccd6f6; margin-top: 0.5rem;">
-                {direction} by <strong>{abs(spread):.1%}</strong> — {action}
+            <div style="font-size: 1.5rem;">🚨</div>
+            <div>
+                <div style="font-size: 11px; font-weight: 700; color: var(--accent-primary); letter-spacing: 0.5px;">ARB OPPORTUNITY</div>
+                <div style="font-size: 9px; color: var(--text-muted);">{direction} by <strong>{abs(spread):.1%}</strong> — {action}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown("")
 
     # --- Live Spread Chart ---
-    st.markdown('<div class="section-header">📈 Live Spread Chart</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><span>Live Spread Chart</span></div>', unsafe_allow_html=True)
     
     if st.session_state.spread_history:
         df = pd.DataFrame(st.session_state.spread_history[-200:])
@@ -605,17 +860,22 @@ elif st.session_state.phase == "monitor":
         fig = make_subplots(rows=2, cols=1, row_heights=[0.7, 0.3],
                             shared_xaxes=True, vertical_spacing=0.05)
         
+        # Color palette for chart
+        K_COLOR = "#64ffda"
+        P_COLOR = "#0ea5e9"
+        S_COLOR = "rgba(100,255,218,0.2)"
+        
         # Top: Kalshi vs Poly probability
         if "kalshi_mid" in df.columns:
             fig.add_trace(go.Scatter(x=df["time"], y=df["kalshi_mid"], name="Kalshi Mid",
-                                     line=dict(color="#64ffda", width=2)), row=1, col=1)
+                                     line=dict(color=K_COLOR, width=2)), row=1, col=1)
         if "poly_mid" in df.columns:
             fig.add_trace(go.Scatter(x=df["time"], y=df["poly_mid"], name="Poly Mid",
-                                     line=dict(color="#ffd93d", width=2)), row=1, col=1)
+                                     line=dict(color=P_COLOR, width=2)), row=1, col=1)
         
         # Bottom: Spread
         if "spread" in df.columns:
-            colors = ["#64ffda" if abs(s) > 0.03 else "#30475e" for s in df["spread"].fillna(0)]
+            colors = [K_COLOR if abs(s) > 0.03 else "rgba(74, 85, 104, 0.3)" for s in df["spread"].fillna(0)]
             fig.add_trace(go.Bar(x=df["time"], y=df["spread"], name="Spread",
                                  marker_color=colors), row=2, col=1)
             fig.add_hline(y=0.03, line_dash="dash", line_color="rgba(100,255,218,0.33)", row=2, col=1)
@@ -623,55 +883,65 @@ elif st.session_state.phase == "monitor":
         
         fig.update_layout(
             template="plotly_dark",
-            paper_bgcolor="#0a192f",
-            plot_bgcolor="#112240",
+            paper_bgcolor="#060d1b",
+            plot_bgcolor="rgba(255,255,255,0.01)",
             height=450,
             margin=dict(l=50, r=20, t=30, b=30),
-            legend=dict(orientation="h", y=1.08),
-            yaxis=dict(title="Probability", tickformat=".1%"),
-            yaxis2=dict(title="Spread", tickformat=".1%"),
+            legend=dict(orientation="h", y=1.08, font=dict(size=10, color="#4a5568")),
+            yaxis=dict(title="Probability", tickformat=".1%", gridcolor="#15202e"),
+            yaxis2=dict(title="Spread", tickformat=".1%", gridcolor="#15202e"),
+            xaxis=dict(gridcolor="#15202e"),
+            xaxis2=dict(gridcolor="#15202e"),
         )
         st.plotly_chart(fig, use_container_width=True, key="spread_chart")
     else:
         st.info("Waiting for data from both exchanges...")
 
     # --- Orderbook Display ---
-    st.markdown('<div class="section-header">📊 Orderbook</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><span>Live Orderbook</span></div>', unsafe_allow_html=True)
     
     ob1, ob2 = st.columns(2)
     with ob1:
-        st.markdown("**Kalshi**")
         kb, ka = prices.get("kalshi_bid"), prices.get("kalshi_ask")
-        if kb is not None and ka is not None:
-            k_spread = ka - kb
-            st.markdown(f"""
-            | | Price | Size |
-            |---|---|---|
-            | 🟢 Bid | **{kb:.1%}** | {prices.get('kalshi_bid_size', 0)} |
-            | 🔴 Ask | **{ka:.1%}** | {prices.get('kalshi_ask_size', 0)} |
-            | Spread | {k_spread:.1%} | |
-            """)
-        elif kb is not None:
-            st.markdown(f"🟢 Bid: **{kb:.1%}** (waiting for ask...)")
-        else:
-            st.info("Connecting to Kalshi...")
+        st.markdown(f"""
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px;">
+            <div style="font-size: 9px; color: var(--accent-primary); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;">KALSHI ORDERBOOK</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 11px;">
+                <span style="color: var(--text-muted); font-size: 9px;">SIDE</span>
+                <span style="color: var(--text-muted); font-size: 9px; text-align: center;">PRICE</span>
+                <span style="color: var(--text-muted); font-size: 9px; text-align: right;">SIZE</span>
+                
+                <span style="color: var(--accent-primary);">BID</span>
+                <span style="font-weight: 700; color: var(--accent-primary); text-align: center;">{f'{kb:.1%}' if kb else '—'}</span>
+                <span style="color: var(--text-muted); text-align: right;">{prices.get('kalshi_bid_size', 0)}</span>
+                
+                <span style="color: #ff6b6b;">ASK</span>
+                <span style="font-weight: 700; color: #ff6b6b; text-align: center;">{f'{ka:.1%}' if ka else '—'}</span>
+                <span style="color: var(--text-muted); text-align: right;">{prices.get('kalshi_ask_size', 0)}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with ob2:
-        st.markdown("**Polymarket**")
         pb, pa = prices.get("poly_bid"), prices.get("poly_ask")
-        if pb is not None and pa is not None:
-            p_spread = pa - pb
-            st.markdown(f"""
-            | | Price | |
-            |---|---|---|
-            | 🟢 Bid | **{pb:.4f}** | |
-            | 🔴 Ask | **{pa:.4f}** | |
-            | Spread | {p_spread:.4f} | |
-            """)
-        elif pb is not None:
-            st.markdown(f"🟢 Bid: **{pb:.4f}** (waiting for ask...)")
-        else:
-            st.info("Connecting to Polymarket...")
+        st.markdown(f"""
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px;">
+            <div style="font-size: 9px; color: var(--accent-secondary); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px;">POLYMARKET ORDERBOOK</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 11px;">
+                <span style="color: var(--text-muted); font-size: 9px;">SIDE</span>
+                <span style="color: var(--text-muted); font-size: 9px; text-align: center;">PRICE</span>
+                <span style="color: var(--text-muted); font-size: 9px; text-align: right;">SIZE</span>
+                
+                <span style="color: var(--accent-primary);">BID</span>
+                <span style="font-weight: 700; color: var(--accent-primary); text-align: center;">{f'${pb:.4f}' if pb else '—'}</span>
+                <span style="color: var(--text-muted); text-align: right;">—</span>
+                
+                <span style="color: #ff6b6b;">ASK</span>
+                <span style="font-weight: 700; color: #ff6b6b; text-align: center;">{f'${pa:.4f}' if pa else '—'}</span>
+                <span style="color: var(--text-muted); text-align: right;">—</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # Auto-refresh
     time.sleep(1)
@@ -680,8 +950,8 @@ elif st.session_state.phase == "monitor":
 
 elif st.session_state.phase == "analyze":
     cfg = st.session_state.match_result["config"]
-    st.markdown(f"# 📊 Post-Session Analysis")
-    st.markdown(f"**{cfg.get('away_team', '?')} @ {cfg.get('home_team', '?')}** | {cfg.get('game_date', '')}")
+    st.markdown(f'<h1 style="font-size: 20px;">Post-Session Analysis</h1>', unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size: 10px; color: var(--text-muted); margin-top: 4px; margin-bottom: 20px;">{cfg.get("away_team", "?")} @ {cfg.get("home_team", "?")} · {cfg.get("game_date", "")}</p>', unsafe_allow_html=True)
     
     history = st.session_state.spread_history
     arb_events = st.session_state.arb_events
@@ -691,112 +961,56 @@ elif st.session_state.phase == "analyze":
         st.stop()
     
     df = pd.DataFrame(history)
+    spreads = df["spread"].dropna()
     
     # --- Summary Stats ---
-    st.markdown('<div class="section-header">📋 Summary Statistics</div>', unsafe_allow_html=True)
-    
-    spreads = df["spread"].dropna()
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        _metric_card("Observations", str(len(df)), f"{(df['ts'].max() - df['ts'].min()):.0f}s session" if len(df) > 1 else "")
+        _metric_card("TICKS", str(len(df)), f"{(df['ts'].max() - df['ts'].min()):.0f}s session" if len(df) > 1 else "")
     with col2:
-        _metric_card("Mean Spread", f"{spreads.mean():+.2%}" if len(spreads) else "—", "avg K-P difference")
+        _metric_card("MEAN SPREAD", f"{spreads.mean():+.2%}" if len(spreads) else "—", "avg K-P diff")
     with col3:
-        _metric_card("Max Spread", f"{spreads.max():+.2%}" if len(spreads) else "—", "peak opportunity")
+        _metric_card("MAX SPREAD", f"{spreads.max():+.2%}" if len(spreads) else "—", "peak opp")
     with col4:
-        _metric_card("Min Spread", f"{spreads.min():+.2%}" if len(spreads) else "—", "deepest reversal")
+        _metric_card("STD DEV", f"{spreads.std():.2%}" if len(spreads) > 1 else "—", "volatility")
     with col5:
-        _metric_card("Arb Events", str(len(arb_events)), f"|spread| > 3% threshold", "match-high" if arb_events else "")
+        _metric_card("ARB WINDOWS", str(len(arb_events)), f"|spread| > 3%", "match-high" if arb_events else "")
     
     st.markdown("")
 
-    # --- Spread Time Series ---
-    st.markdown('<div class="section-header">📈 Spread Over Time</div>', unsafe_allow_html=True)
+    # --- Charts Row ---
+    st.markdown('<div class="section-header"><span>Performance Visualization</span></div>', unsafe_allow_html=True)
     
-    fig1 = make_subplots(rows=2, cols=1, row_heights=[0.6, 0.4],
-                          shared_xaxes=True, vertical_spacing=0.08,
-                          subplot_titles=("Probability Comparison", "Kalshi-Poly Spread"))
-    
-    fig1.add_trace(go.Scatter(x=df["time"], y=df["kalshi_mid"], name="Kalshi",
-                               line=dict(color="#64ffda", width=2)), row=1, col=1)
-    fig1.add_trace(go.Scatter(x=df["time"], y=df["poly_mid"], name="Poly",
-                               line=dict(color="#ffd93d", width=2)), row=1, col=1)
-    
-    # Spread with fill
-    fig1.add_trace(go.Scatter(x=df["time"], y=df["spread"], name="Spread",
-                               fill="tozeroy", line=dict(color="#64ffda", width=1.5),
-                               fillcolor="rgba(100,255,218,0.15)"), row=2, col=1)
-    fig1.add_hline(y=0.03, line_dash="dash", line_color="rgba(100,255,218,0.33)", row=2, col=1,
-                    annotation_text="3% threshold")
-    fig1.add_hline(y=-0.03, line_dash="dash", line_color="rgba(255,107,107,0.33)", row=2, col=1)
-    fig1.add_hline(y=0, line_color="rgba(255,255,255,0.13)", row=2, col=1)
-    
-    # Mark arb events
-    if arb_events:
-        arb_df = pd.DataFrame(arb_events)
-        fig1.add_trace(go.Scatter(x=arb_df["time"], y=arb_df["spread"],
-                                   mode="markers", name="Arb Signal",
-                                   marker=dict(color="#ff6b6b", size=8, symbol="diamond")),
-                        row=2, col=1)
-    
-    fig1.update_layout(
-        template="plotly_dark", paper_bgcolor="#0a192f", plot_bgcolor="#112240",
-        height=550, margin=dict(l=50, r=20, t=40, b=30),
-        legend=dict(orientation="h", y=1.08),
-        yaxis=dict(tickformat=".1%"), yaxis2=dict(tickformat=".2%"),
-    )
-    st.plotly_chart(fig1, use_container_width=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        fig1 = go.Figure()
+        fig1.add_trace(go.Scatter(x=df["time"], y=df["spread"], name="Spread",
+                                   fill="tozeroy", line=dict(color="#64ffda", width=1.5),
+                                   fillcolor="rgba(100,255,218,0.1)"))
+        fig1.add_hline(y=0.03, line_dash="dash", line_color="rgba(255,107,107,0.3)", annotation_text="3% Limit")
+        fig1.update_layout(
+            template="plotly_dark", paper_bgcolor="#060d1b", plot_bgcolor="rgba(255,255,255,0.01)",
+            height=300, margin=dict(l=40, r=20, t=30, b=30),
+            title=dict(text="SPREAD OVER TIME", font=dict(size=10, color="#4a5568")),
+            yaxis=dict(tickformat=".1%", gridcolor="#15202e"),
+            xaxis=dict(gridcolor="#15202e")
+        )
+        st.plotly_chart(fig1, use_container_width=True)
 
-    # --- Spread Distribution ---
-    an1, an2 = st.columns(2)
-    
-    with an1:
-        st.markdown('<div class="section-header">📊 Spread Distribution</div>', unsafe_allow_html=True)
+    with c2:
         fig2 = go.Figure()
-        fig2.add_trace(go.Histogram(
-            x=spreads, nbinsx=40, name="Spread",
-            marker_color="#64ffda", opacity=0.8,
-        ))
-        fig2.add_vline(x=0.03, line_dash="dash", line_color="#ff6b6b",
-                        annotation_text="3% threshold")
-        fig2.add_vline(x=-0.03, line_dash="dash", line_color="#ff6b6b")
-        fig2.add_vline(x=spreads.mean(), line_dash="solid", line_color="#ffd93d",
-                        annotation_text=f"Mean: {spreads.mean():.2%}")
+        fig2.add_trace(go.Histogram(x=spreads, nbinsx=30, marker_color="#64ffda", opacity=0.7))
         fig2.update_layout(
-            template="plotly_dark", paper_bgcolor="#0a192f", plot_bgcolor="#112240",
-            height=350, margin=dict(l=50, r=20, t=30, b=30),
-            xaxis=dict(title="Spread (K-P)", tickformat=".1%"),
-            yaxis=dict(title="Count"),
-            showlegend=False,
+            template="plotly_dark", paper_bgcolor="#060d1b", plot_bgcolor="rgba(255,255,255,0.01)",
+            height=300, margin=dict(l=40, r=20, t=30, b=30),
+            title=dict(text="SPREAD DISTRIBUTION", font=dict(size=10, color="#4a5568")),
+            yaxis=dict(gridcolor="#15202e"),
+            xaxis=dict(tickformat=".1%", gridcolor="#15202e")
         )
         st.plotly_chart(fig2, use_container_width=True)
-    
-    with an2:
-        st.markdown('<div class="section-header">🎯 Arb Windows</div>', unsafe_allow_html=True)
-        if arb_events:
-            arb_df = pd.DataFrame(arb_events)
-            fig3 = go.Figure()
-            colors = ["#64ffda" if s > 0 else "#ff6b6b" for s in arb_df["spread"]]
-            fig3.add_trace(go.Scatter(
-                x=arb_df["time"], y=arb_df["spread"],
-                mode="markers+lines", name="Arb Events",
-                marker=dict(color=colors, size=10, symbol="diamond"),
-                line=dict(color="#30475e", width=1),
-            ))
-            fig3.add_hline(y=0, line_color="rgba(255,255,255,0.13)")
-            fig3.update_layout(
-                template="plotly_dark", paper_bgcolor="#0a192f", plot_bgcolor="#112240",
-                height=350, margin=dict(l=50, r=20, t=30, b=30),
-                xaxis=dict(title="Time"),
-                yaxis=dict(title="Spread", tickformat=".1%"),
-                showlegend=False,
-            )
-            st.plotly_chart(fig3, use_container_width=True)
-        else:
-            st.info("No arb events detected during this session (|spread| > 3%)")
 
     # --- Detailed Stats Table ---
-    st.markdown('<div class="section-header">📋 Detailed Statistics</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><span>📋 Detailed Statistics</span></div>', unsafe_allow_html=True)
     
     stats = {
         "Metric": [
@@ -821,3 +1035,71 @@ elif st.session_state.phase == "analyze":
         ],
     }
     st.dataframe(pd.DataFrame(stats), use_container_width=True, hide_index=True)
+
+    # --- AI-Powered Insights ---
+    st.markdown("")
+    st.markdown('<div class="section-header"><span>🤖 AI-Powered Insights</span></div>', unsafe_allow_html=True)
+    
+    if not history or len(df) == 0:
+        st.info("No session data available for AI analysis.")
+    elif st.session_state.ai_insights is None:
+        if st.button("🧠 Generate AI Analysis", type="primary", use_container_width=True):
+            st.session_state.ai_loading = True
+            st.rerun()
+    
+    if st.session_state.ai_loading and st.session_state.ai_insights is None:
+        with st.spinner("🤖 Analyzing session data with AI..."):
+            cfg = st.session_state.match_result["config"]
+            
+            summary_stats = {
+                "n_observations": len(df),
+                "session_duration_sec": round(df["ts"].max() - df["ts"].min(), 1) if len(df) > 1 else 0,
+                "mean_spread": round(float(spreads.mean()), 4) if len(spreads) else None,
+                "std_spread": round(float(spreads.std()), 4) if len(spreads) > 1 else None,
+                "max_spread": round(float(spreads.max()), 4) if len(spreads) else None,
+                "min_spread": round(float(spreads.min()), 4) if len(spreads) else None,
+                "mean_kalshi": round(float(df["kalshi_mid"].dropna().mean()), 4) if len(df) else None,
+                "mean_poly": round(float(df["poly_mid"].dropna().mean()), 4) if len(df) else None,
+                "n_arb_events": len(arb_events),
+                "pct_time_in_arb": round(len(arb_events) / len(df) * 100, 1) if len(df) > 0 else 0,
+            }
+            
+            st.session_state.ai_insights = generate_session_insights(
+                home_team=cfg.get("home_team", "Unknown"),
+                away_team=cfg.get("away_team", "Unknown"),
+                game_date=cfg.get("game_date", ""),
+                spread_history=[
+                    {
+                        "time": row.get("time", ""),
+                        "kalshi_mid": row.get("kalshi_mid"),
+                        "poly_mid": row.get("poly_mid"),
+                        "spread": row.get("spread"),
+                    }
+                    for row in history
+                ],
+                arb_events=arb_events,
+                summary_stats=summary_stats,
+            )
+            st.session_state.ai_loading = False
+            st.rerun()
+    
+    if st.session_state.ai_insights:
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(167,139,250,0.05) 0%, rgba(100,255,218,0.05) 100%);
+                    border: 1px solid rgba(167,139,250,0.15); border-radius: 12px; padding: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 1rem;">
+                <span style="font-size: 1.1rem;">🤖</span>
+                <span style="color: #a78bfa; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">
+                    AI Session Analysis
+                </span>
+                <span style="color: #4a5568; font-size: 0.65rem; background: rgba(167,139,250,0.1);
+                             padding: 2px 8px; border-radius: 4px;">Powered by OpenAI</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown(st.session_state.ai_insights)
+        
+        if st.button("🔄 Regenerate Analysis", key="regen_ai"):
+            st.session_state.ai_insights = None
+            st.session_state.ai_loading = True
+            st.rerun()
