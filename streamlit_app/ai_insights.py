@@ -11,7 +11,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = OpenAI()
+_client = None
+
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = OpenAI()
+    return _client
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
@@ -72,7 +79,7 @@ Be specific — reference actual numbers from the data. Don't hedge excessively.
 Provide a quantitative analysis of the cross-exchange spread behavior and arbitrage opportunities."""
 
     try:
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model=MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -116,7 +123,7 @@ Use markdown formatting. Be specific with numbers."""
 Provide a brief market overview and highlight the most interesting opportunities."""
 
     try:
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model=MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
