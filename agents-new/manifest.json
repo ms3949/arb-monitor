@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "locale": "en_US.UTF-8",
+  "metadata": {
+    "appmode": "python-fastapi",
+    "entrypoint": "app.api:app"
+  },
+  "python": {
+    "version": "3.9.6",
+    "package_manager": {
+      "name": "pip",
+      "version": "26.0.1",
+      "package_file": "requirements.txt"
+    }
+  },
+  "environment": {
+    "python": {
+      "requires": "~=3.12.0"
+    }
+  },
+  "files": {
+    "requirements.txt": {
+      "checksum": "9b088d20665a7b613166df1092fcbeaf"
+    },
+    ".env": {
+      "checksum": "c8d96693510f77120741bd6aede56a20"
+    },
+    ".env.example": {
+      "checksum": "6fcb9882842516dfa2c5fa39e0ccd952"
+    },
+    ".python-version": {
+      "checksum": "0885a8b0e7355de614d6685033e058f6"
+    },
+    "AGENT.md": {
+      "checksum": "f029a5b9cf11f7594871fd4dabedaa78"
+    },
+    "README.md": {
+      "checksum": "a1a61508f984165241f664edb12c46e5"
+    },
+    "app/__init__.py": {
+      "checksum": "2f6b00056ab5afdc2294d13f9d247cbd"
+    },
+    "app/api.py": {
+      "checksum": "0bf9d4345b52a3895ef6e9e3804f206f"
+    },
+    "app/context.py": {
+      "checksum": "2bb98340791dc58d7d6cf3232481e448"
+    },
+    "app/guardrails.py": {
+      "checksum": "e57467359056d3fca77ef7be18b0edb5"
+    },
+    "app/logging_setup.py": {
+      "checksum": "01dcf29eb8b1a7bfc32d2aa6820ec84d"
+    },
+    "app/loop.py": {
+      "checksum": "6aceb22d2e241d6f6eedb4a6d5ede8b1"
+    },
+    "app/tools.py": {
+      "checksum": "dbbe5a7d1c4480e2f7a6f1eb3cf3efd3"
+    },
+    "deployme.sh": {
+      "checksum": "3a837d853e60f0d9444d90f43edce636"
+    },
+    "logs/.gitkeep": {
+      "checksum": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "logs/agent.log": {
+      "checksum": "a9235dc1072e68304bc10e292f5a2c53"
+    },
+    "manifestme.sh": {
+      "checksum": "fd837d4fa1b99c0f4841106c4931aa62"
+    },
+    "runme.sh": {
+      "checksum": "12e88633a8c4ce80a2749ce1b4ed8849"
+    },
+    "skills/README.md": {
+      "checksum": "3c547e6584a538f04ac9d6c35ec1e026"
+    },
+    "skills/disaster_situational_brief.md": {
+      "checksum": "057079b4db0098df375254c2fdf7e73b"
+    },
+    "skills/evidence_brief.md": {
+      "checksum": "e58557d9c01d606b480149cad5d87696"
+    },
+    "skills/references_section.md": {
+      "checksum": "393405910bf622ca65538fcb697317cc"
+    },
+    "skills/source_quality.md": {
+      "checksum": "7de50051c39b6c8d1e74b3d4ed1342cf"
+    },
+    "testme.py": {
+      "checksum": "53ae4b6f66644637aa6aee29099b5117"
+    }
+  }
+}

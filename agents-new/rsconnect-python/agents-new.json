@@ -1,0 +1,12 @@
+{
+    "https://connect.systems-apps.com": {
+        "server_url": "https://connect.systems-apps.com",
+        "filename": "/Users/masaab/ms5381/agents-new",
+        "app_url": "https://connect.systems-apps.com/content/cf018c1a-ab41-4921-8b7c-6bf5dc348078/",
+        "app_id": "229",
+        "app_guid": "cf018c1a-ab41-4921-8b7c-6bf5dc348078",
+        "title": "course-autonomous-agent",
+        "app_mode": "python-fastapi",
+        "app_store_version": 1
+    }
+}
