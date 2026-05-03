@@ -24,7 +24,7 @@ jobs:
       - name: CHECK FILE SIZE LIMITS
         run: |
           set -euo pipefail
-          FILE="data/traffic.db"
+          FILE="agents-new/data/traffic.db"
           MAX_MB=95
           if [ -f "$FILE" ]; then
             SIZE_BYTES=$(wc -c < "$FILE")
@@ -47,7 +47,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-ingest-${{ hashFiles('.github/workflows/12-ingest-python.yml', '01_ingest_traffic.py') }}
+          key: ${{ runner.os }}-pip-ingest-${{ hashFiles('.github/workflows/12-ingest-python.yml', 'agents-new/01_ingest_traffic.py') }}
           restore-keys: |
             ${{ runner.os }}-pip-ingest-
             ${{ runner.os }}-pip-
@@ -56,13 +56,14 @@ jobs:
         run: pip install requests pandas
 
       - name: RUN INGESTION JOB
+        working-directory: agents-new
         run: python 01_ingest_traffic.py
         
       - name: COMMIT CHANGES
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/traffic.db
+          git add agents-new/data/traffic.db
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
