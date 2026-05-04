@@ -1,8 +1,8 @@
-name: Traffic Model Training (Python)
+name: Train Model (Python)
 
 on:
   schedule:
-    - cron: '0 * * * *' # every hour
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 concurrency:
@@ -19,7 +19,7 @@ jobs:
       - name: CHECKOUT REPOSITORY
         uses: actions/checkout@v4
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: SETUP PYTHON
         uses: actions/setup-python@v5
@@ -30,17 +30,23 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-train-${{ hashFiles('.github/workflows/12-train-python.yml', '12_end/02_train_model.py') }}
+          key: ${{ runner.os }}-pip-train-${{ hashFiles('.github/workflows/12-train-python.yml') }}
           restore-keys: |
             ${{ runner.os }}-pip-train-
             ${{ runner.os }}-pip-
 
       - name: INSTALL PYTHON DEPENDENCIES
-        run: pip install requests pandas xgboost scikit-learn
+        run: pip install pandas scikit-learn xgboost
 
       - name: RUN TRAINING JOB
         working-directory: 12_end
-        run: python 02_train_model.py
+        run: python3 02_train_model.py
+
+      - name: UPLOAD MODEL ARTIFACT
+        uses: actions/upload-artifact@v4
+        with:
+          name: xgboost-model
+          path: 12_end/data/modelpy.json
 
       - name: COMMIT CHANGES
         run: |
@@ -50,7 +56,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "chore: retrain traffic model $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git commit -m "chore: retrain model $(date -u +%Y-%m-%dT%H:%M:%SZ) [skip ci]"
             git pull --rebase origin main
             git push origin HEAD:main
           fi
